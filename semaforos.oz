@@ -2,6 +2,13 @@
 %Jose Heriberto Torres 1600701
 declare
 
+[QTk]={Module.link ["x-oz://system/wp/QTk.ozf"]}
+
+
+[P]={Module.link ["x-oz://system/wp/Prototyper.ozf"]}
+{P.run}
+
+
 %Esta funcion crea un objeto activo
 fun {CrearObjActivo Clase Inic}
    Obj={New Clase Inic}
@@ -82,7 +89,7 @@ class SemaforoConFlecha from Semaforo
       {Browse @nombre#@estado}
       %Espero 5 segundos
       {Delay 5000}
-      estado := 'rojoYFlechaVerde'
+      estado := 'rojoYFlechaRojo'
       {Browse @nombre#@estado}      
       
    end
