@@ -1,5 +1,6 @@
 %Carlos Andres Delgado Saavedra 1301662
 %Jose Heriberto Torres 1600701
+%Nelson Chantre
 declare
 
 %Parametros del proyecto

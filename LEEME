@@ -1,0 +1,7 @@
+El proyecto no requiere una librería especial.
+
+Debe ejecutar
+
+oz semaforos.oz
+
+Desde la misma carpeta, de la otra forma las imágenes no cargan.
