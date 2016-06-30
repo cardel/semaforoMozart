@@ -1,26 +1,29 @@
+%Proyecto final modelos y paradigmas de programación 2016
 %Carlos Andres Delgado Saavedra 1301662
 %Jose Heriberto Torres 1600701
-%Nelson Chantre
+%Nelson Fabian Chantre 1600702
 declare
 
 %Parametros del proyecto
 
 %CambioVerde a AmarilloRojo
-VerdeAAmarilloRojo = 8000
+VerdeAAmarilloRojo = 15000
 TiempoSalidaCarros = {Int.'div' VerdeAAmarilloRojo 6}
 %CambioAmarilloRojo a Rojo
 AmarilloARojo = 4000
 
-%GeneracionCarros
+%GeneracionCarros (Un tiempo aleatorio entre 3 y 20 segundos)
 Generar = 20000
+MinimoGenerar = 3000
+%El tiempo minimo no debería ser 0 para evitar problemas de sincronización
 
-%Delay de salida
-DelaySalida = 1000
+%Delay de salida (Este delay es el espacio que sale entre carros)
+DelaySalida = 800
 
 [QTk]={Module.link ["x-oz://system/wp/QTk.ozf"]}
 
 
-%Imagen de fondo
+%Imagen de fondo del proyecto
 CD = {OS.getCWD}
 Fondo={QTk.newImage photo(file:CD#'/fondo.gif' height:433 width:658)}
 
@@ -132,14 +135,9 @@ LuzSemaforo18 = {New Tk.canvasTag tkInit(parent:Lien)}
 
 LucesSemaforoBD2 = semaforo(rojo:LuzSemaforo16 amarillo:LuzSemaforo17 verde: LuzSemaforo18)
 
-%{Luz1Semaforo1 tk(move 40 0)}
-%{Luz1Semaforo1 tk(itemconfigure fill:blue)}
-
 {Wind show}
 
-
-
-%Esta funcion crea un objeto activo
+%Esta funcion crea un objeto activo, ha sido tomada del material del curso
 fun {CrearObjActivo Clase Inic}
    Obj={New Clase Inic}
    P
@@ -152,7 +150,8 @@ in
 end
 
 %Clase CrearCalle
-%Es una cola
+%Es una cola que recibe los mensajes, los carros se encolan en el puerto de entrada
+%Y son desencolado en el puerto de atención
 
 fun {Calle}
    Llegada PuertoIn={NewPort Llegada}
@@ -208,7 +207,7 @@ class Semaforo
       thread
 	 {For 1 5 1
 	  proc{$ P}
-	     {CircularVehiculos @calle @sensor}
+	     thread {CircularVehiculos @calle @sensor} end
 	     {Delay TiempoSalidaCarros}
 	  end
 	 }
@@ -231,7 +230,8 @@ class Semaforo
       Valor = @estado
    end
 end
-%Clase para los semaforos con flecha, es un semeforo pero con más cosas
+%Clase para los semaforos con flecha, es un semeforo normal, considerando las fechas
+%También considera el semaforo de la derecha para iniciar la sincronización
 class SemaforoConFlecha from Semaforo
 %En este cambia la secuencia, no más
    attr semaforoderecha
@@ -240,7 +240,7 @@ class SemaforoConFlecha from Semaforo
       semaforoderecha := SemaforoDerecha
    end
    meth secuencia
-      %Solo se modela la fecha
+      %Solo e modela la fecha
 
       estado := 'rojoYFlechaVerde'
       {@luces.rojo tk(itemconfigure fill:gray)}
@@ -248,14 +248,14 @@ class SemaforoConFlecha from Semaforo
       {@luces.verde tk(itemconfigure fill:green)}
 
       %Mientras atiendo los carros
-      thread
-	 {For 1 5 1
-	  proc{$ P}
-	     {CircularVehiculos @calle @sensor}
-	     {Delay TiempoSalidaCarros}
-	  end
-	 }
+      thread {For 1 5 1
+	      proc{$ P}
+		 thread {CircularVehiculos @calle @sensor} end
+		 {Delay TiempoSalidaCarros}
+	      end
+	     }
       end
+     
       
       %Espero algunos segundos
       {Delay VerdeAAmarilloRojo}
@@ -283,7 +283,7 @@ class SemaforoConFlecha from Semaforo
 end
 
 %Clase sensor
-%Esta clase lleva un conteo de los carros que hay
+%Esta clase lleva un conteo de los carros que hay en cada carril
 class Sensor
    attr numeroCarros
 
@@ -311,6 +311,7 @@ end
 
 
 %Funciones para generar vehiculos automaticamente, estos van a las calles y hacen cola
+%Es función genera vehiculos para las calle A y los carriles derechos de B, sólo pueden ir derecho o voltear a la derecha
 proc{GenerarVehiculosTipo1 Origen Calle Carros Posicion Sensor}
    local
       Xr =  {New Tk.canvasTag tkInit(parent:Lien)}
@@ -320,12 +321,12 @@ proc{GenerarVehiculosTipo1 Origen Calle Carros Posicion Sensor}
       ValueY
    in
       if Numero == 0 then
-	 X = derecho
+	 X = 'derecho'
       else
-	 X = volteader
+	 X = 'volteader'
       end
        %Se produce un delay para la creación de los carros
-      {Delay {OS.rand} mod Generar}
+      {Delay {OS.rand} mod Generar + MinimoGenerar}
 
      %El sensor detecta un carro mas
       {Sensor incrementar}
@@ -342,33 +343,27 @@ proc{GenerarVehiculosTipo1 Origen Calle Carros Posicion Sensor}
    end
 end
 
-
+%Es función genera vehiculos para los carriles izquierdos de B, por lo que sólo pueden voltear a la izquierda
 proc{GenerarVehiculosTipo2 Origen Calle Carros Posicion Sensor}
    local
       Xr =  {New Tk.canvasTag tkInit(parent:Lien)}
-      Numero = {OS.rand} mod 2
       X
       PosicionProximo
    in
-      if Numero == 0 then
-	 X = derecho
-      else
-	 X = volteaizq
-      end
+      X = 'volteaizq'
       %Se produce un delay entre 0 y 25 segundos
-      {Delay {OS.rand} mod Generar}
+      {Delay {OS.rand} mod Generar + MinimoGenerar}
 
       %El sensor detecta un carro mas
       {Sensor incrementar}
       {Lien create(image Posicion.xi Posicion.yi image:Carros anchor:center tags:Xr)}
 
       %Animacion
-      {Animar Xr Posicion Sensor}
+      thread {Animar Xr Posicion Sensor} end
       
       %Insercion del carro en la calle
       {Calle.ins X#Xr#Origen}
-      
-      
+            
       {GenerarVehiculosTipo2 Origen Calle Carros Posicion Sensor}
    end
 end
@@ -392,16 +387,16 @@ proc{CircularVehiculos Calle Sensor}
 	 OrigenCarro = CarroAtendido.3
 
 	 if OrigenCarro == 'A1' then
-	    if DestinoCarro == derecho then
+	    if DestinoCarro == 'derecho' then
 	       MoverX = 20
 	       MoverY = 0
 	    else
 	       MoverX=0
 	       MoverY=20
 	    
-	       {For 1 15 2
+	       {For 1 10 2
 		proc{$ P}		   
-		   {Delay 500}
+		   {Delay 100}
 		   {ManejadorCarro tk(move 10 0)}
 		end
 	       }
@@ -409,15 +404,15 @@ proc{CircularVehiculos Calle Sensor}
 	    end
 	 end
 	 if OrigenCarro == 'A2' then
-	    if DestinoCarro == derecho then
+	    if DestinoCarro == 'derecho' then
 	       MoverX = ~20
 	       MoverY = 0
 	    else
 	       MoverX=0
 	       MoverY=~20
-	       {For 1 15 2
+	       {For 1 10 2
 		proc{$ P}		   
-		   {Delay 500}
+		   {Delay 100}
 		   {ManejadorCarro tk(move ~10 0)}
 		end
 	       }
@@ -426,21 +421,21 @@ proc{CircularVehiculos Calle Sensor}
 	 end
 
 	 if OrigenCarro == 'B1' then
-	    if DestinoCarro == derecho then
+	    if DestinoCarro == 'derecho' then
 	       MoverX = 0
 	       MoverY = 20
-	    elseif DestinoCarro == volteader then
-	       MoverX= 20
+	    elseif DestinoCarro == 'volteader' then
+	       MoverX= ~20
 	       MoverY= 0
 	       {For 1 15 2
 		proc{$ P}		   
-		   {Delay 500}
+		   {Delay 100}
 		   {ManejadorCarro tk(move 0 5)}
 		end
 	       }
 	        {ManejadorCarro tk(itemconfigure image:CarroCalleA2)}
 	    else
-	       MoverX= ~20
+	       MoverX= 20
 	       MoverY = 0
 	       {For 1 15 2
 		proc{$ P}		   
@@ -453,11 +448,11 @@ proc{CircularVehiculos Calle Sensor}
 	 end
 
 	 if OrigenCarro == 'B2' then
-	    if DestinoCarro == derecho then
+	    if DestinoCarro == 'derecho' then
 	       MoverX = 0
 	       MoverY = ~20
-	    elseif DestinoCarro == volteader then
-	       MoverX = ~20
+	    elseif DestinoCarro == 'volteader' then
+	       MoverX = 20
 	       MoverY = 0
 	       {For 1 15 2
 		proc{$ P}		   
@@ -468,11 +463,11 @@ proc{CircularVehiculos Calle Sensor}
 	       }
 	        {ManejadorCarro tk(itemconfigure image:CarroCalleA1)}
 	    else
-	       MoverX = 20
+	       MoverX = ~20
 	       MoverY = 0
 	       {For 1 15 2
 		proc{$ P}		   
-		   {Delay 500}
+		   {Delay 200}
 		   {ManejadorCarro tk(move 0 ~5)}
 		end
 	       }
@@ -480,10 +475,9 @@ proc{CircularVehiculos Calle Sensor}
 	    end
 	 end
 	 
-	 {For 1 25 2
-	  proc{$ P}
-	     
-	     {Delay 500}
+	 {For 1 15 1
+	  proc{$ P}	     
+	     {Delay 100}
 	     {ManejadorCarro tk(move MoverX MoverY)}
 	  end
 	 }
@@ -542,6 +536,7 @@ proc{Animar Carro Posicion Sensor}
 end
 
 %Programa
+
 local
   %Generamos secuencia de calles
    CalleIB1  CalleDB1 CalleIB2 CalleDB2 CalleA1 CalleA2
@@ -554,16 +549,16 @@ local
    SensorCarrilBD2 = {New Sensor inic}
 
    %Generamos secuencia de Semaforos
-   SemaforoA1 = {CrearObjActivo Semaforo inic('A1'  SemaforoA2 LucesSemaforoA1 CalleA1 SensorCarrilA1)}
-   SemaforoA2 = {CrearObjActivo Semaforo inic('A2'  SemaforoA1 LucesSemaforoA2 CalleA2 SensorCarrilA2)}
+   SemaforoA1 = {CrearObjActivo Semaforo inic('A1' SemaforoA2 LucesSemaforoA1 CalleA1 SensorCarrilA1)}
+   SemaforoA2 = {CrearObjActivo Semaforo inic('A2' SemaforoA1 LucesSemaforoA2 CalleA2 SensorCarrilA2)}
       
-   SemaforoBI1 = {CrearObjActivo SemaforoConFlecha inic('B1'  SemaforoBI2 LucesSemaforoBI1 CalleIB1 SensorCarrilBI1)}
-   SemaforoBD1 = {CrearObjActivo Semaforo inic('B1'  SemaforoBD2 LucesSemaforoBD1 CalleDB1 SensorCarrilBD1)}
+   SemaforoBI1 = {CrearObjActivo SemaforoConFlecha inic('B1' SemaforoBI2 LucesSemaforoBI1 CalleIB1 SensorCarrilBI1)}
+   SemaforoBD1 = {CrearObjActivo Semaforo inic('B1' SemaforoBD2 LucesSemaforoBD1 CalleDB1 SensorCarrilBD1)}
    
-   SemaforoBI2 = {CrearObjActivo SemaforoConFlecha inic('B2'  SemaforoBI1 LucesSemaforoBI2 CalleIB2 SensorCarrilBI2)}
-   SemaforoBD2 = {CrearObjActivo Semaforo inic('B2'  SemaforoBD1 LucesSemaforoBD2 CalleDB2 SensorCarrilBD2)} 
+   SemaforoBI2 = {CrearObjActivo SemaforoConFlecha inic('B2' SemaforoBI1 LucesSemaforoBI2 CalleIB2 SensorCarrilBI2)}
+   SemaforoBD2 = {CrearObjActivo Semaforo inic('B2' SemaforoBD1 LucesSemaforoBD2 CalleDB2 SensorCarrilBD2)} 
 in
-
+   %Este procedimiento es que lanza el proyecto
    proc{IniciarProyecto}      
    %Establecer control
       {SemaforoA1 setControl(SemaforoBI1)}
@@ -585,18 +580,27 @@ in
       
    %Enviar vehiculos
    %Carriles izquierda
-      
+
+      %B1 es la calle de arriba
       thread {GenerarVehiculosTipo2 'B1' CalleIB1 CarroCalleBI1 pos(xi:320 yi:130 xf:320 yf:230)  SensorCarrilBI1} end
-      thread {GenerarVehiculosTipo2 'B2' CalleIB2 CarroCalleBI2 pos(xi:400 yi:460 xf:400 yf:350)  SensorCarrilBI2} end
+
+      %B2 es la calle de abajo
+      thread {GenerarVehiculosTipo2 'B2' CalleIB2 CarroCalleBI2 pos(xi:380 yi:460 xf:380 yf:350)  SensorCarrilBI2} end
       
    %Carriles derechas
+      %B1 calle de arriba
       thread {GenerarVehiculosTipo1 'B1' CalleDB1 CarroCalleBD1 pos(xi:290 yi:130 xf:290 yf:230)  SensorCarrilBD1} end
-      thread {GenerarVehiculosTipo1 'B2' CalleDB2 CarroCalleBD2 pos(xi:380 yi:460 xf:380 yf:350)  SensorCarrilBD2} end
+
+      %B2 Calle de abajo
+      thread {GenerarVehiculosTipo1 'B2' CalleDB2 CarroCalleBD2 pos(xi:400 yi:460 xf:400 yf:350)  SensorCarrilBD2} end
+      
       thread {GenerarVehiculosTipo1 'A1' CalleA1 CarroCalleA1 pos(xi:160 yi:310 xf:260 yf:310)  SensorCarrilA1} end
       thread {GenerarVehiculosTipo1 'A2' CalleA2 CarroCalleA2 pos(xi:540 yi:290 xf:460 yf:290)  SensorCarrilA2} end
       
    %Logicamente el control inicia con el semaforo A1
       {SemaforoA1 control}
+
+
  
    end   
 end
